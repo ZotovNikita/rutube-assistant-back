@@ -1,3 +1,4 @@
+import asyncio
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -26,7 +27,7 @@ __all__ = ['rag_plugin']
 
 class RStripStrOutputParser(StrOutputParser):
     def parse(self, text: str) -> str:
-        return text.rstrip('\n ')
+        return text.rstrip('\n')
 
 
 class QARequest(BaseModel):
@@ -143,8 +144,10 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         description='Получение ответа на вопрос по Базе Знаний.\n\nОтвет также содержит классификаторы 1-го и 2-го уровней.',
     )
     async def answer_qa(request: QARequest) -> QAResponse:
-        class_1 = predict_class_1(request.question)
-        class_2 = predict_class_2(request.question)
+        loop = asyncio.get_running_loop()
+
+        class_1 = await loop.run_in_executor(None, predict_class_1, request.question)
+        class_2 = await loop.run_in_executor(None, predict_class_2, request.question)
 
         answer = await chain.ainvoke(request.question)
 
@@ -161,8 +164,10 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         description='Предсказать классификаторы 1-го и 2-го уровней.',
     )
     async def answer_classification(request: QARequest) -> ClassificationResponse:
-        class_1 = predict_class_1(request.question)
-        class_2 = predict_class_2(request.question)
+        loop = asyncio.get_running_loop()
+
+        class_1 = await loop.run_in_executor(None, predict_class_1, request.question)
+        class_2 = await loop.run_in_executor(None, predict_class_2, request.question)
 
         return ClassificationResponse(
             class_1=class_1,
