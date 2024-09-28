@@ -88,7 +88,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 
 Вопрос: {question}
 
-Если не можешь найти ответ в контексте, вежливо скажи, что не знаешь ответ
+Если не можешь найти ответ в Базе Знаний, вежливо скажи, что не знаешь ответ.
 """
     prompt = ChatPromptTemplate.from_template(template)
 
