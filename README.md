@@ -13,3 +13,7 @@ Backend &amp; ML for RUTUBE AI assistant
 4. Файл `.env.example` переименовать в `.env` и заполнить необходимые переменные окружения
 
 5. Выполнить `python -m src`
+
+По умолчанию Swagger развернут по адресу `http://localhost:8558/docs`.
+
+Получение ответа на вопрос и классификаторов 1-го и 2-го уровней доступно по запросу `POST http://localhost:8558/qa`.
