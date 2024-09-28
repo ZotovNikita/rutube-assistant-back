@@ -8,3 +8,4 @@ venv.bak/
 .vscode
 __pycache__/
 modeling/cache_data
+cache/
