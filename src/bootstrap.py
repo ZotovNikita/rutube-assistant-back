@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.shared.swagger import swagger_plugin
+from src.toxicity import toxicity_plugin
 from src.rag import rag_plugin
 from .app import App
 from .ioc import ioc
@@ -20,6 +21,7 @@ def bootstrap(
     ioc.register(Settings, instance=settings)
 
     app.add_plugin(swagger_plugin(settings.swagger))
+    app.add_plugin(toxicity_plugin(settings))
     app.add_plugin(rag_plugin(settings))
 
     @asynccontextmanager

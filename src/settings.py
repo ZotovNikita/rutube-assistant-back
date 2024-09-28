@@ -1,3 +1,4 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.shared.swagger import SwaggerSettings
@@ -46,6 +47,9 @@ class Settings(BaseConfig):
 
     llm_model: str = 'gemma2:9b'
     llm_service_url: str = 'http://localhost:11434'
+
+    toxicity_abusive_path: Path
+    toxicity_curse_path: Path
 
     app: AppSettings
     swagger: SwaggerSettings = SwaggerSettings()

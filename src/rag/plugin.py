@@ -1,3 +1,4 @@
+import re
 import asyncio
 from typing import AsyncGenerator
 
@@ -25,8 +26,12 @@ from fastapi.responses import StreamingResponse
 __all__ = ['rag_plugin']
 
 
-class RStripStrOutputParser(StrOutputParser):
+class FormatStrOutputParser(StrOutputParser):
+    toxicity_pattern: re.Pattern | None = None
+
     def parse(self, text: str) -> str:
+        if self.toxicity_pattern is not None:
+            text = self.toxicity_pattern.sub('***', text)
         return text.rstrip('\n')
 
 
@@ -106,11 +111,13 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
     def format_docs(docs):
         return '\n\n'.join([d.page_content for d in docs])
 
+    toxicity_pattern = ioc.resolve('toxicity_pattern')
+
     chain = (
         {'context': ensemble_retriever | format_docs, 'question': RunnablePassthrough()}
         | prompt
         | model
-        | RStripStrOutputParser()
+        | FormatStrOutputParser(toxicity_pattern=toxicity_pattern)
     )
 
     # Classification
