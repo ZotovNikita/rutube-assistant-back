@@ -87,12 +87,11 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         | StrOutputParser()
     )
 
-    @fastapi.post("/qa/stream")
+    @fastapi.post("/qa/stream", tags=['qa'], name='Получить потоковый ответ на вопрос')
     async def stream_answer_qa(request: QARequest) -> StreamingResponse:
         return StreamingResponse(chain.astream(request.question), media_type='text/event-stream')
 
-
-    @fastapi.post("/qa")
+    @fastapi.post("/qa", tags=['qa'], name='Получить ответ на вопрос')
     async def answer_qa(request: QARequest) -> QAResponse:
         class_1, class_2 = await predict_cls(request.question)
 
@@ -104,8 +103,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
             class_2=class_2,
         )
 
-
-    @fastapi.post("/classification")
+    @fastapi.post("/classification", tags=['classification'], name='Классифицировать вопрос')
     async def answer_classification(request: QARequest) -> ClassificationResponse:
         class_1, class_2 = await predict_cls(request.question)
 

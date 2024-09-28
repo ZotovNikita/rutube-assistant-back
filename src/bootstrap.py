@@ -30,6 +30,7 @@ def bootstrap(
 
     tags = [
         {'name': 'qa', 'description': 'Вопросно-Ответная система'},
+        {'name': 'classification', 'description': 'Классификация'},
     ]
 
     fastapi = FastAPI(
