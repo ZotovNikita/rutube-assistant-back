@@ -20,7 +20,7 @@ def bootstrap(
     ioc.register(Settings, instance=settings)
 
     app.add_plugin(swagger_plugin(settings.swagger))
-    app.add_plugin(rag_plugin())
+    app.add_plugin(rag_plugin(settings))
 
     @asynccontextmanager
     async def lifespan(_):
