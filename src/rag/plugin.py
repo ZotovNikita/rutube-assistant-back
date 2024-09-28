@@ -24,6 +24,11 @@ from fastapi.responses import StreamingResponse
 __all__ = ['rag_plugin']
 
 
+class RStripStrOutputParser(StrOutputParser):
+    def parse(self, text: str) -> str:
+        return text.rstrip('\n ')
+
+
 class QARequest(BaseModel):
     question: str
 
@@ -104,7 +109,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         {'context': ensemble_retriever | format_docs, 'question': RunnablePassthrough()}
         | prompt
         | model
-        | StrOutputParser()
+        | RStripStrOutputParser()
     )
 
     # Classification
