@@ -15,6 +15,8 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama.llms import OllamaLLM
+from sklearn.preprocessing import LabelEncoder
+from sklearn.neighbors import KNeighborsClassifier
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 
@@ -37,12 +39,19 @@ class ClassificationResponse(BaseModel):
     class_2: str
 
 
-async def predict_cls(question: str) -> tuple[str, str]:
-    return 'class_1', 'class_2'
+def class_predictor_factory(embedding_model, model, label_encoder):
+    def predict_cls(question: str) -> str:
+        emb = embedding_model.encode([question], normalize_embeddings=True)
+        pred = model.predict(emb)
+        cls = label_encoder.inverse_transform(pred)
+        return cls.item()
+    return predict_cls
 
 
 async def rag_plugin(settings: Settings) -> AsyncGenerator:
     fastapi = ioc.resolve(FastAPI)
+
+    # QA
 
     embeddings = HuggingFaceEmbeddings(
         model_name=settings.embedding_model,
@@ -98,23 +107,39 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         | StrOutputParser()
     )
 
+    # Classification
+
+    emb_model = embeddings.client
+
+    model_cls1: KNeighborsClassifier = load('./cache/classification/model_class1.pkl')
+    le1: LabelEncoder = load('./cache/classification/le_class1.pkl')
+
+    model_cls2: KNeighborsClassifier = load('./cache/classification/model_class2.pkl')
+    le2: LabelEncoder = load('./cache/classification/le_class2.pkl')
+
+    predict_class_1 = class_predictor_factory(emb_model, model_cls1, le1)
+    predict_class_2 = class_predictor_factory(emb_model, model_cls2, le2)
+
+    # Views
+
     @fastapi.post(
         '/qa/stream',
-        tags=['qa'],
+        tags=['QA'],
         name='Получить потоковый ответ на вопрос',
-        description='Получение ответа на вопрос по Базе Знаний в потоковом режиме: отправка происходит каждый сгенерированный токен',
+        description='Получение ответа на вопрос по Базе Знаний в потоковом режиме: отправка происходит каждый сгенерированный токен.',
     )
     async def stream_answer_qa(request: QARequest) -> StreamingResponse:
         return StreamingResponse(chain.astream(request.question), media_type='text/event-stream')
 
     @fastapi.post(
         '/qa',
-        tags=['qa'],
-        name='Получить ответ на вопрос',
-        description='Получение ответа на вопрос по Базе Знаний. Ответ также содержит метки классов',
+        tags=['QA'],
+        name='Получить ответ на вопрос и классификаторы.',
+        description='Получение ответа на вопрос по Базе Знаний.\n\nОтвет также содержит классификаторы 1-го и 2-го уровней.',
     )
     async def answer_qa(request: QARequest) -> QAResponse:
-        class_1, class_2 = await predict_cls(request.question)
+        class_1 = predict_class_1(request.question)
+        class_2 = predict_class_2(request.question)
 
         answer = await chain.ainvoke(request.question)
 
@@ -128,10 +153,11 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         '/classification',
         tags=['classification'],
         name='Классифицировать вопрос',
-        description='Предсказать классификаторы 1-го и 2-го уровней',
+        description='Предсказать классификаторы 1-го и 2-го уровней.',
     )
     async def answer_classification(request: QARequest) -> ClassificationResponse:
-        class_1, class_2 = await predict_cls(request.question)
+        class_1 = predict_class_1(request.question)
+        class_2 = predict_class_2(request.question)
 
         return ClassificationResponse(
             class_1=class_1,

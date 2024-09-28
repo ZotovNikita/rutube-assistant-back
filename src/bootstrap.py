@@ -29,7 +29,7 @@ def bootstrap(
         await app.shutdown()
 
     tags = [
-        {'name': 'qa', 'description': 'Вопросно-Ответная система'},
+        {'name': 'QA', 'description': 'Вопросно-Ответная система'},
         {'name': 'classification', 'description': 'Классификация'},
     ]
 
