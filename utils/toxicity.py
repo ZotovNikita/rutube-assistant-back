@@ -36,5 +36,5 @@ def predict_toxicity(
 
 
 if __name__ == '__main__':
-    print(predict_toxicity('Шел бы ты к другому боту', '../cache/toxicity/', '../cache/toxicity/'))
-    print(predict_toxicity('Вам следует сначала прочитать документацию', '../cache/toxicity/', '../cache/toxicity/'))
+    print(predict_toxicity('Шел бы ты к другому боту', './cache/toxicity/', './cache/toxicity/'))
+    print(predict_toxicity('Вам следует сначала прочитать документацию', './cache/toxicity/', './cache/toxicity/'))
