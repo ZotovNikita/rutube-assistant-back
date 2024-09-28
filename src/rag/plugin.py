@@ -6,11 +6,14 @@ from src.ioc import ioc
 from src.settings import Settings
 
 from pydantic import BaseModel
-from langchain_core.prompts import ChatPromptTemplate
+from joblib import load
+from langchain.retrievers import EnsembleRetriever
 from langchain.schema import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain_community.retrievers import BM25Retriever
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama.llms import OllamaLLM
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
@@ -60,6 +63,13 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         }
     )
 
+    bm25_retriever: BM25Retriever = load(settings.bm25_retriever_model_path)
+
+    ensemble_retriever = EnsembleRetriever(
+        retrievers=[retriever, bm25_retriever],
+        weights=[0.9, 0.1],
+    )
+
     template = """
 Ты интеллектуальный помощник компании RUTUBE и ты очень точно отвечаешь на вопросы. Будь вежливым.
 Ответь на вопрос, выбрав фрагмент из Базы Знаний (далее - БЗ), не меняя его по возможности, сохрани все имена, аббревиатуры, даты и ссылки.
@@ -82,7 +92,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         return '\n\n'.join([d.page_content for d in docs])
 
     chain = (
-        {'context': retriever | format_docs, 'question': RunnablePassthrough()}
+        {'context': ensemble_retriever | format_docs, 'question': RunnablePassthrough()}
         | prompt
         | model
         | StrOutputParser()

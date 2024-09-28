@@ -42,6 +42,8 @@ class Settings(BaseConfig):
     db_cache_folder: str = './cache/db/faiss'
     db_index_name: str
 
+    bm25_retriever_model_path: str = './cache/bm25.pkl'
+
     llm_model: str = 'gemma2:9b'
     llm_service_url: str = 'http://localhost:11434'
 
