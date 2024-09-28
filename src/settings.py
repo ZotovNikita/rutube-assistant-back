@@ -48,8 +48,8 @@ class Settings(BaseConfig):
     llm_model: str = 'gemma2:9b'
     llm_service_url: str = 'http://localhost:11434'
 
-    toxicity_abusive_path: Path
-    toxicity_curse_path: Path
+    toxicity_abusive_path: Path = './data/toxicity/ru_abusive_words.txt'
+    toxicity_curse_path: Path = './data/toxicity/ru_curse_words.txt'
 
     app: AppSettings
     swagger: SwaggerSettings = SwaggerSettings()
