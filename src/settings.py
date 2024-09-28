@@ -36,6 +36,15 @@ class Settings(BaseConfig):
         env_nested_delimiter='__',
     )
 
+    embedding_cache_folder: str = './cache/embedding/'
+    embedding_model: str = 'deepvk/USER-bge-m3'
+
+    db_cache_folder: str = './cache/db/faiss'
+    db_index_name: str
+
+    llm_model: str = 'gemma2:9b'
+    llm_service_url: str = 'http://localhost:11434'
+
     app: AppSettings
     swagger: SwaggerSettings = SwaggerSettings()
 
