@@ -8,7 +8,7 @@ Backend &amp; ML for RUTUBE AI assistant
 
 2. Установить torch с CUDA на вашей машине (для windows: `pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu118`)
 
-3. Выполнить `pip install -r ./req.txt`
+3. Выполнить `pip install -r ./requirements.txt`
 
 4. Файл `.env.example` переименовать в `.env` и заполнить необходимые переменные окружения
 
