@@ -1,6 +1,7 @@
 import re
 import asyncio
 from typing import AsyncGenerator
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -9,6 +10,10 @@ from src.settings import Settings
 
 from pydantic import BaseModel
 from joblib import load
+import onnxruntime as ort
+import torch
+import numpy as np
+from transformers import AutoTokenizer, AutoModel
 from langchain.retrievers import EnsembleRetriever
 from langchain.schema import StrOutputParser
 from langchain_core.documents import Document
@@ -51,13 +56,33 @@ class ClassificationResponse(BaseModel):
     class_2: str
 
 
-def class_predictor_factory(embedding_model, model, label_encoder):
-    def predict_cls(question: str) -> str:
-        emb = embedding_model.encode([question], normalize_embeddings=True)
-        pred = model.predict(emb)
+def vectorize_texts(texts, tokenizer, embedding_model, batch_size=1):
+    vectors = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        if not all(isinstance(text, str) for text in batch):
+            raise ValueError("All elements in the batch must be strings.")
+        inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt")
+        with torch.no_grad():
+            outputs = embedding_model(**inputs)
+        vectors.append(outputs.last_hidden_state.mean(dim=1).numpy())
+    return np.vstack(vectors)
+
+
+
+def class_predictor_factory(emb_tokenizer, emb_model, model_onnx, label_encoder):
+    def predict_class(question: str) -> str:
+        emb = vectorize_texts([question], emb_tokenizer, emb_model, 1)
+        emb = emb.reshape(1, 1, -1)
+
+        outputs = model_onnx.run(None, {'input': emb})
+        pred = outputs[0].argmax(axis=1)
+
         cls = label_encoder.inverse_transform(pred)
         return cls.item()
-    return predict_cls
+
+    return predict_class
+
 
 
 async def rag_plugin(settings: Settings) -> AsyncGenerator:
@@ -69,6 +94,14 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         model_name=settings.embedding_model,
         cache_folder=settings.embedding_cache_folder,
     )
+
+    if not (Path(settings.embedding_cache_folder) / 'vocab.txt').exists():
+        AutoTokenizer.from_pretrained(settings.embedding_model).save_pretrained(str(settings.embedding_cache_folder))
+    emb_tokenizer = AutoTokenizer.from_pretrained(settings.embedding_cache_folder)
+
+    if not (Path(settings.embedding_cache_folder) / 'model_sum.safetensors').exists():
+        AutoModel.from_pretrained(settings.embedding_model).save_pretrained(str(settings.embedding_cache_folder))
+    emb_model = AutoModel.from_pretrained(settings.embedding_cache_folder)
 
     qa_db = FAISS.load_local(
         folder_path=settings.db_cache_folder,
@@ -123,16 +156,22 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 
     # Classification
 
-    emb_model = embeddings.client
+    # emb_model = embeddings.client
 
-    model_cls1: KNeighborsClassifier = load('./cache/classification/model_class1.pkl')
-    le1: LabelEncoder = load('./cache/classification/le_class1.pkl')
+    # model_cls1: KNeighborsClassifier = load('./cache/classification/model_class1.pkl')
+    # le1: LabelEncoder = load('./cache/classification/le_class1.pkl')
+    model_cls1 = ort.InferenceSession('./cache/classification/best_model_c1.onnx', providers=['CPUExecutionProvider'])
+    le1: LabelEncoder = load('./cache/classification/label_encoder_c1.pkl')
 
-    model_cls2: KNeighborsClassifier = load('./cache/classification/model_class2.pkl')
-    le2: LabelEncoder = load('./cache/classification/le_class2.pkl')
+    # model_cls2: KNeighborsClassifier = load('./cache/classification/model_class2.pkl')
+    # le2: LabelEncoder = load('./cache/classification/le_class2.pkl')
+    model_cls2 = ort.InferenceSession('./cache/classification/best_model_c22.onnx', providers=['CPUExecutionProvider'])
+    le2: LabelEncoder = load('./cache/classification/label_encoder_c2.pkl')
 
-    predict_class_1 = class_predictor_factory(emb_model, model_cls1, le1)
-    predict_class_2 = class_predictor_factory(emb_model, model_cls2, le2)
+    # predict_class_1 = class_predictor_factory(emb_model, model_cls1, le1, onnx=True)
+    # predict_class_2 = class_predictor_factory(embeddings.client, model_cls2, le2, onnx=False)
+    predict_class_1 = class_predictor_factory(emb_tokenizer, emb_model, model_cls1, le1)
+    predict_class_2 = class_predictor_factory(emb_tokenizer, emb_model, model_cls2, le2)
 
     # similar docs
 
