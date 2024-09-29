@@ -59,3 +59,4 @@ if __name__ == '__main__':
     print(predict_toxicity('Шел бы ты к другому боту', './cache/toxicity/', './cache/toxicity/'))
     #Возвращает False - текст нетоксичный
     print(predict_toxicity('Вам следует сначала прочитать документацию', './cache/toxicity/', './cache/toxicity/'))
+p
