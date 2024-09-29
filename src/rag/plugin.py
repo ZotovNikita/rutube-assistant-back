@@ -207,7 +207,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         return StreamingResponse(rag_chain.astream(request.question), media_type='text/event-stream')
 
     @fastapi.post(
-        '/qa',
+        '/predict',
         tags=['QA'],
         name='Получить ответ на вопрос и классификаторы.',
         description='Получение ответа на вопрос по Базе Знаний.\n\nОтвет также содержит классификаторы 1-го и 2-го уровней.',
