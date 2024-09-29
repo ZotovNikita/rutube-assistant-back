@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from joblib import load
 from langchain.retrievers import EnsembleRetriever
 from langchain.schema import StrOutputParser
+from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_community.vectorstores import FAISS
@@ -133,6 +134,28 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
     predict_class_1 = class_predictor_factory(emb_model, model_cls1, le1)
     predict_class_2 = class_predictor_factory(emb_model, model_cls2, le2)
 
+    # similar docs
+
+    part1_db = FAISS.load_local(
+        folder_path='./cache/db/user',
+        embeddings=embeddings,
+        index_name='faiss.db',
+        allow_dangerous_deserialization=True,
+    )
+    part2_db = FAISS.load_local(
+        folder_path='./cache/db/content',
+        embeddings=embeddings,
+        index_name='faiss.db',
+        allow_dangerous_deserialization=True,
+    )
+    part1_db.merge_from(part2_db)
+    parts_retriever = part1_db.as_retriever(
+        search_type='similarity',
+        search_kwargs={
+            'k': 3,
+        }
+    )
+
     # Views
 
     @fastapi.post(
@@ -180,5 +203,16 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
             class_1=class_1,
             class_2=class_2,
         )
+
+    @fastapi.post(
+        '/similar',
+        tags=['QA'],
+        name='Найти схожие фрагменты из документов',
+        description='',
+    )
+    async def find_similar_docs(request: QARequest) -> list[Document]:
+        docs = await parts_retriever.ainvoke(request.question)
+        return docs
+
 
     yield
