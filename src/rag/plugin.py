@@ -69,14 +69,14 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         cache_folder=settings.embedding_cache_folder,
     )
 
-    db = FAISS.load_local(
+    qa_db = FAISS.load_local(
         folder_path=settings.db_cache_folder,
         embeddings=embeddings,
         index_name=settings.db_index_name,
         allow_dangerous_deserialization=True,
     )
 
-    retriever = db.as_retriever(
+    retriever = qa_db.as_retriever(
         search_type='similarity',
         search_kwargs={
             'k': 3,
@@ -85,12 +85,12 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 
     bm25_retriever: BM25Retriever = load(settings.bm25_retriever_model_path)
 
-    ensemble_retriever = EnsembleRetriever(
+    rag_ensemble_retriever = EnsembleRetriever(
         retrievers=[retriever, bm25_retriever],
         weights=[0.9, 0.1],
     )
 
-    template = """
+    rag_template = """
 Ты интеллектуальный помощник компании RUTUBE и ты очень точно отвечаешь на вопросы. Будь вежливым.
 Ответь на вопрос, выбрав фрагмент из Базы Знаний (далее - БЗ), не меняя его по возможности, сохрани все имена, аббревиатуры, даты и ссылки.
 Вот База Знаний:
@@ -101,7 +101,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 
 Если не можешь найти ответ в Базе Знаний, вежливо скажи, что не знаешь ответ.
 """
-    prompt = ChatPromptTemplate.from_template(template)
+    rag_prompt = ChatPromptTemplate.from_template(rag_template)
 
     model = OllamaLLM(
         model=settings.llm_model, 
@@ -113,9 +113,9 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 
     toxicity_pattern = ioc.resolve('toxicity_pattern')
 
-    chain = (
-        {'context': ensemble_retriever | format_docs, 'question': RunnablePassthrough()}
-        | prompt
+    rag_chain = (
+        {'context': rag_ensemble_retriever | format_docs, 'question': RunnablePassthrough()}
+        | rag_prompt
         | model
         | FormatStrOutputParser(toxicity_pattern=toxicity_pattern)
     )
@@ -142,7 +142,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         description='Получение ответа на вопрос по Базе Знаний в потоковом режиме: отправка происходит каждый сгенерированный токен.',
     )
     async def stream_answer_qa(request: QARequest) -> StreamingResponse:
-        return StreamingResponse(chain.astream(request.question), media_type='text/event-stream')
+        return StreamingResponse(rag_chain.astream(request.question), media_type='text/event-stream')
 
     @fastapi.post(
         '/qa',
@@ -156,7 +156,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         class_1 = await loop.run_in_executor(None, predict_class_1, request.question)
         class_2 = await loop.run_in_executor(None, predict_class_2, request.question)
 
-        answer = await chain.ainvoke(request.question)
+        answer = await rag_chain.ainvoke(request.question)
 
         return QAResponse(
             answer=answer,
