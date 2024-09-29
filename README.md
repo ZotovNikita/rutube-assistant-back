@@ -48,3 +48,5 @@ ollama run gemma2:9b
 
 В файле `utils/toxicity.py` находится функция для определения токсичности текста.
 Файлы в `data/toxicity` необходимы для определения токсичных слов.
+
+Обучение моделей классификации (файл /modeling/classification.ipynb) осуществлялось в google collab
