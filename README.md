@@ -4,6 +4,20 @@ Backend &amp; ML for RUTUBE AI assistant
 
 ## Инструкция по установке
 
+0. Установить ПО Ollama для размещения LLM на локальном компьютере.
+
+Необходимо перейти на официальный сайт Ollama и установить ее. После этого необходимо в консоли ввести следующую команду:
+
+```
+ollama run gemma2:9b
+```
+
+Это необходимо для ее установки. После этого необходимо в файле .env указать параметры LLM_SERVICE_URL (адрес, на котором находится ваша LLM, см. документацию Ollama) и LLM_MODEL=gemma2:9b.
+
+Это справедливо для случая, если ваша LLM -- gemma2:9b. В ином случае, укажите другое название модели.
+
+После выполнения всех шагов вы можете локально обращаться к LLM при помощи REST API.
+
 1. Установить python v3.11.9
 
 2. Установить torch с CUDA на вашей машине (для windows: `pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu118`)
@@ -12,7 +26,9 @@ Backend &amp; ML for RUTUBE AI assistant
 
 4. Файл `.env.example` переименовать в `.env` и заполнить необходимые переменные окружения
 
-5. Выполнить `python -m src`
+5. Скопировать папку `cache/` из https://drive.google.com/drive/folders/1bj6EWUij7ubVi3ngOFyyFl5uwptxw_eh?usp=sharing
+
+6. Выполнить `python -m src`
 
 По умолчанию Swagger развернут по адресу `http://localhost:8558/docs`.
 
