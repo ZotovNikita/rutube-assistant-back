@@ -33,6 +33,9 @@ __all__ = ['rag_plugin']
 
 
 class FormatStrOutputParser(StrOutputParser):
+    """
+    Парсер с логикой фильтрации матов и оскорблений.
+    """
     toxicity_pattern: re.Pattern | None = None
 
     def parse(self, text: str) -> str:
@@ -42,21 +45,27 @@ class FormatStrOutputParser(StrOutputParser):
 
 
 class QARequest(BaseModel):
+    """Модель запроса"""
     question: str
 
 
 class QAResponse(BaseModel):
+    """Модель ответа"""
     answer: str
     class_1: str
     class_2: str
 
 
 class ClassificationResponse(BaseModel):
+    """Модель ответа для результата классификации"""
     class_1: str
     class_2: str
 
 
 def vectorize_texts(texts, tokenizer, embedding_model, batch_size=1):
+    """
+    Функция для векторизации текста.
+    """
     vectors = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
@@ -71,7 +80,11 @@ def vectorize_texts(texts, tokenizer, embedding_model, batch_size=1):
 
 
 def class_predictor_factory(emb_tokenizer, emb_model, model_onnx, label_encoder):
+    """
+    Фабрика для получения функции предсказания классификатора уровней 1 или 2.
+    """
     def predict_class(question: str) -> str:
+        """Функция для предсказания классификатора"""
         emb = vectorize_texts([question], emb_tokenizer, emb_model, 1)
         emb = emb.reshape(1, 1, -1)
 
@@ -86,23 +99,32 @@ def class_predictor_factory(emb_tokenizer, emb_model, model_onnx, label_encoder)
 
 
 async def rag_plugin(settings: Settings) -> AsyncGenerator:
+    """
+    Плагин для создания моделей и самого rag'а.
+    """
     fastapi = ioc.resolve(FastAPI)
 
     # QA
 
+    # модель для создания эмбеддингов
     embeddings = HuggingFaceEmbeddings(
         model_name=settings.embedding_model,
         cache_folder=settings.embedding_cache_folder,
     )
 
+    # Токенайзер и Модель для эмбеддингов
+    # (нужны из-за разных моделей, т.к. при использовании
+    # модели выше модели классификации выдавали бред)
     if not (Path(settings.embedding_cache_folder) / 'vocab.txt').exists():
         AutoTokenizer.from_pretrained(settings.embedding_model).save_pretrained(str(settings.embedding_cache_folder))
     emb_tokenizer = AutoTokenizer.from_pretrained(settings.embedding_cache_folder)
 
+    # Загружают модель, в последующие разы подгружают из локальной папки
     if not (Path(settings.embedding_cache_folder) / 'model_sum.safetensors').exists():
         AutoModel.from_pretrained(settings.embedding_model).save_pretrained(str(settings.embedding_cache_folder))
     emb_model = AutoModel.from_pretrained(settings.embedding_cache_folder)
 
+    # Векторная БД
     qa_db = FAISS.load_local(
         folder_path=settings.db_cache_folder,
         embeddings=embeddings,
@@ -110,6 +132,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         allow_dangerous_deserialization=True,
     )
 
+    # Объект получателя (ретривер) для langchain
     retriever = qa_db.as_retriever(
         search_type='similarity',
         search_kwargs={
@@ -117,13 +140,16 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
         }
     )
 
+    # Еще один ретривер
     bm25_retriever: BM25Retriever = load(settings.bm25_retriever_model_path)
 
+    # Необходимый для взвешенной работы ретриверов - их ансамбля
     rag_ensemble_retriever = EnsembleRetriever(
         retrievers=[retriever, bm25_retriever],
         weights=[0.9, 0.1],
     )
 
+    # Промпт для LLM для задачи QA, основанный на базе знаний
     rag_template = """
 Ты интеллектуальный помощник компании RUTUBE и ты очень точно отвечаешь на вопросы. Будь вежливым.
 Ответь на вопрос, выбрав фрагмент из Базы Знаний (далее - БЗ), не меняя его по возможности, сохрани все имена, аббревиатуры, даты и ссылки.
@@ -137,16 +163,20 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 """
     rag_prompt = ChatPromptTemplate.from_template(rag_template)
 
+    # Абстракция langchain над LLM
     model = OllamaLLM(
         model=settings.llm_model, 
-        base_url=settings.llm_service_url,
+        base_url=settings.llm_service_url,  # модель на localhost, в другом микро сервисе
     )
 
+    # функция для создания строки контекста
     def format_docs(docs):
         return '\n\n'.join([d.page_content for d in docs])
 
+    # разрешается зависимость - получение паттерна для определения токсичного текста
     toxicity_pattern = ioc.resolve('toxicity_pattern')
 
+    # пайплайн langchain для задачи QA
     rag_chain = (
         {'context': rag_ensemble_retriever | format_docs, 'question': RunnablePassthrough()}
         | rag_prompt
@@ -156,7 +186,8 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
 
     # Classification
 
-    # emb_model = embeddings.client
+    # Загружаются модели в формате .onnx
+    # И LabelEncoder'ы через joblib
 
     # model_cls1: KNeighborsClassifier = load('./cache/classification/model_class1.pkl')
     # le1: LabelEncoder = load('./cache/classification/le_class1.pkl')
@@ -168,13 +199,15 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
     model_cls2 = ort.InferenceSession('./cache/classification/best_model_c22.onnx', providers=['CPUExecutionProvider'])
     le2: LabelEncoder = load('./cache/classification/label_encoder_c2.pkl')
 
+    # Через фабрику создаются функции для предсказания классификаторов
+
     # predict_class_1 = class_predictor_factory(emb_model, model_cls1, le1, onnx=True)
     # predict_class_2 = class_predictor_factory(embeddings.client, model_cls2, le2, onnx=False)
     predict_class_1 = class_predictor_factory(emb_tokenizer, emb_model, model_cls1, le1)
     predict_class_2 = class_predictor_factory(emb_tokenizer, emb_model, model_cls2, le2)
 
     # similar docs
-
+    # Инстанс БД для поиска схожих фрагментов в исходных файлах (не вопросы-ответы, а docx файлы)
     part1_db = FAISS.load_local(
         folder_path='./cache/db/user',
         embeddings=embeddings,
@@ -196,6 +229,7 @@ async def rag_plugin(settings: Settings) -> AsyncGenerator:
     )
 
     # Views
+    # Эндпоинты для работы с моделями
 
     @fastapi.post(
         '/qa/stream',

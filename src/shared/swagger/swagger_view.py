@@ -13,6 +13,9 @@ __all__ = ['SwaggerView']
 
 
 class SwaggerView:
+    """
+    Представление с необходимыми функциями для локального сваггера
+    """
     __slots__ = (
         '_server',
         '_swagger_sub_app_name',

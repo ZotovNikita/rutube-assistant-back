@@ -8,12 +8,16 @@ from .settings import load_settings
 
 
 if __name__ == '__main__':
+    # загрузка настроек
     settings = load_settings()
+    #  создание приложения
     app = App()
 
+    # сборка приложения
     bootstrap(app=app, settings=settings)
 
     try:
+        # запуск приложения
         uvicorn.run(
             app=ioc.resolve(FastAPI),
             host=settings.app.host,

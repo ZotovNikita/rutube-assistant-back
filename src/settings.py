@@ -17,6 +17,7 @@ __all__ = [
 ]
 
 
+# Базовый класс настроек с дефолтными параметрами
 class BaseConfig(BaseSettings):
     model_config = SettingsConfigDict(
         extra='ignore',
@@ -24,17 +25,19 @@ class BaseConfig(BaseSettings):
     )
 
 
+# Настройки веб части приложения
 class AppSettings(BaseConfig):
     title: str
     host: str
     port: int
 
 
+# Настройки всего приложения
 class Settings(BaseConfig):
     model_config = SettingsConfigDict(
         env_file='.env',
         env_file_encoding='utf-8',
-        env_nested_delimiter='__',
+        env_nested_delimiter='__',  # позволяет задать настройки вложенным сущностям (например, APP__HOST) 
     )
 
     embedding_cache_folder: str = './cache/embedding/'
@@ -55,5 +58,6 @@ class Settings(BaseConfig):
     swagger: SwaggerSettings = SwaggerSettings()
 
 
+# Функция для создания настроек (подгрузит данные из .env)
 def load_settings() -> Settings:
     return Settings()

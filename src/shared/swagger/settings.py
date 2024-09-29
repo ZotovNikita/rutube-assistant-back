@@ -8,6 +8,8 @@ __all__ = ['SwaggerSettings']
 
 
 class SwaggerSettings(BaseSettings):
+    """Настройки для плагина сваггера"""
+
     model_config = SettingsConfigDict(
         extra='ignore',
         case_sensitive=False,

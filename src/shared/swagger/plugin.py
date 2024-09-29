@@ -12,6 +12,11 @@ __all__ = ['swagger_plugin']
 
 
 async def swagger_plugin(settings: SwaggerSettings) -> AsyncGenerator:
+    """
+    Плагин для локального сваггера.
+    
+    Подгружаются статичные файлы и переопределяются необходимые эндпоинты.
+    """
     fastapi = ioc.resolve(FastAPI)
 
     if settings.files_dir_path is not None:

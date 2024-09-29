@@ -18,18 +18,24 @@ def bootstrap(
     app: App,
     settings: Settings,
 ) -> None:
+    """
+    Функция для сборки приложения.
+    """
     ioc.register(Settings, instance=settings)
 
+    # В приложение добавляются плагины -- процесс сборки
     app.add_plugin(swagger_plugin(settings.swagger))
     app.add_plugin(toxicity_plugin(settings))
     app.add_plugin(rag_plugin(settings))
 
+    # Определен жизненный цикл приложения
     @asynccontextmanager
     async def lifespan(_):
         await app.startapp()
         yield
         await app.shutdown()
 
+    # теги для сваггера
     tags = [
         {'name': 'QA', 'description': 'Вопросно-Ответная система'},
         {'name': 'classification', 'description': 'Классификация'},
@@ -42,9 +48,10 @@ def bootstrap(
         # openapi_url='/openapi.json',
         openapi_tags=tags,
         redoc_url=None,
-        **dict(docs_url=None) if settings.swagger.files_dir_path else dict(),
+        **dict(docs_url=None) if settings.swagger.files_dir_path else dict(),  # для локального сваггера
     )
 
+    # для доступа с любого хоста
     fastapi.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
@@ -53,4 +60,5 @@ def bootstrap(
         allow_headers=['*'],
     )
 
+    # регистрация зависимости
     ioc.register(FastAPI, instance=fastapi)
